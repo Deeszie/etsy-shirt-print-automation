@@ -74,6 +74,33 @@ def _extract_text_from_response(response_data):
 
     return "\n".join(collected).strip()
 
+def create_blank_white_png(output_path, width=10, height=10):
+    """
+    Create a completely white PNG image.
+
+    Parameters:
+        output_path (str): Full output path including filename.
+        width (int): Image width in pixels.
+        height (int): Image height in pixels.
+    """
+
+    output_path = Path(output_path)
+
+    # Create parent folders automatically if they don't exist
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create pure white RGB image
+    image = Image.new(
+        mode="RGB",
+        size=(width, height),
+        color=(255, 255, 255)
+    )
+
+    # Save as PNG
+    image.save(output_path, format="PNG")
+
+    # print(f"Created: {output_path}")
+
 
 def generate_image_name_description(image_path):
     load_dotenv()
@@ -234,6 +261,7 @@ def image_file_organizing(image_path, name_data):
         for attempt in range(5):
             try:
                 path_obj.rename(new_path)
+                shutil.copy2(str(new_path), "RawImage.png")
                 break
             except PermissionError as ex:
                 last_error = ex
@@ -247,7 +275,7 @@ def image_file_organizing(image_path, name_data):
     for entry in product_root.iterdir():
         if entry.is_dir():
             match = re.match(r"^(\d+)_", entry.name)
-            print(f"\nChecking existing folder: {entry.name}, match: {match}")
+            # print(f"\nChecking existing folder: {entry.name}, match: {match}")
             if match:
                 existing_numbers.append(int(match.group(1)))
     next_number = max(existing_numbers, default=0) + 1
@@ -257,6 +285,13 @@ def image_file_organizing(image_path, name_data):
 
     final_path = new_folder / new_path.name
     shutil.copy2(str(new_path), str(final_path))
+
+    # Generate blank white PNGs for mockups and samples
+    for i in range(1, 6):
+        create_blank_white_png(str(final_path).replace(".png", f"_{i}.png"), width=10, height=10)
+        create_blank_white_png(new_folder / f"Mockup{i}.png", width=10, height=10)
+    create_blank_white_png(new_folder / f"Samples.png", width=10, height=10)
+
     print(f"Moved image file to: {final_path}")
 
     return str(final_path)
@@ -264,16 +299,30 @@ def image_file_organizing(image_path, name_data):
 def psd_setup(image_path):
     with Session(image_path, action="open") as ps:
         doc = ps.active_document
+        width, height = doc.width, doc.height
+        if width >= height:
+            new_width, new_height = 2000, round(2000 * height / width)
+        else:
+            new_width, new_height = round(2000 * width / height), 2000
+        doc.resizeImage(new_width, new_height)
         doc.app.resizeCanvas(2000, 2000, AnchorPosition.MiddleCenter)
         # doc.flatten()
 
+# def samples_image_automation(image_path):
+#     with Session(image_path, action="open") as ps:
+#         doc = ps.active_document
+#         doc.app.resizeCanvas(2000, 2000, AnchorPosition.MiddleCenter)
+#         # doc.flatten()
 
-imageFile = r"RawImage.png"
 
 
 # ========================== Automation V1 =========================
+
+imageFile = r"RawImage.png"
 nameData = generate_image_name_description(imageFile)
 productFilePath = image_file_organizing(imageFile, nameData)
 psd_setup(productFilePath)
+# samples_image_automation(productFilePath)
+
 
 # create_all_dark_mockups(imageFile)

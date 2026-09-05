@@ -10,7 +10,7 @@ import socket
 from urllib import error, request
 from PIL import Image
 from photoshop import Session
-from photoshop.api import ActionDescriptor, AnchorPosition, DialogModes, JPEGSaveOptions, SaveOptions
+from photoshop.api import ActionDescriptor, AnchorPosition, DialogModes, DocumentFill, ElementPlacement, JPEGSaveOptions, SaveOptions
 import struct
 import time
 from pathlib import Path
@@ -232,9 +232,9 @@ def generate_image_name_description(image_path):
     tags = ", ".join(str(tag).strip() for tag in tags) if isinstance(tags, list) else str(tags).strip()
 
     print("\n=== ChatGPT Result ===")
-    print(f"Title: {title if title else '[not parsed]'}")
-    print(f"Description: {description if description else '[not parsed]'}")
-    print(f"Tags: {tags if tags else '[not parsed]'}")
+    print(f"Title: {title if title else '[not parsed]'}\n")
+    print(f"Description: {description if description else '[not parsed]'}\n")
+    print(f"Tags: {tags if tags else '[not parsed]'}\n\n")
 
     return {"title": title, "description": description, "tags": tags}
 
@@ -296,6 +296,12 @@ def image_file_organizing(image_path, name_data):
 
     return str(final_path)
 
+def set_image_dpi(image_path, dpi=300):
+    """Stamp print DPI metadata onto the image (no pixel upscaling)."""
+    with Image.open(image_path) as img:
+        img.save(image_path, dpi=(dpi, dpi))
+    print(f"Set DPI to {dpi} for: {image_path}")
+
 def psd_setup(image_path):
     with Session(image_path, action="open") as ps:
         doc = ps.active_document
@@ -308,12 +314,21 @@ def psd_setup(image_path):
         doc.app.resizeCanvas(2000, 2000, AnchorPosition.MiddleCenter)
         # doc.flatten()
 
-# def samples_image_automation(image_path):
-#     with Session(image_path, action="open") as ps:
-#         doc = ps.active_document
-#         doc.app.resizeCanvas(2000, 2000, AnchorPosition.MiddleCenter)
-#         # doc.flatten()
+def samples_image_automation(image_path):
+    path_obj = Path(image_path)
+    stem = path_obj.stem
+    parent = path_obj.parent
 
+    with Session() as ps:
+        target_doc = ps.app.documents.add(2000, 2000, name="Samples", initialFill=DocumentFill.White)
+
+        for i in range(1, 6):
+            sample_path = parent / f"{stem}_{i}.png"
+            with Session(str(sample_path), action="open", auto_close=True) as src_ps:
+                src_doc = src_ps.active_document
+                src_doc.activeLayer.duplicate(target_doc.app, ElementPlacement.PlaceAtBeginning)
+
+        ps.app.activeDocument = target_doc.app
 
 
 # ========================== Automation V1 =========================
@@ -321,7 +336,11 @@ def psd_setup(image_path):
 imageFile = r"RawImage.png"
 nameData = generate_image_name_description(imageFile)
 productFilePath = image_file_organizing(imageFile, nameData)
+set_image_dpi(productFilePath)
 psd_setup(productFilePath)
+
+# Manual Step Gap
+
 # samples_image_automation(productFilePath)
 
 
